@@ -1,27 +1,56 @@
+# 🧹 CleanMyCSV — Instant Excel/CSV Cleaner
 
-# CleanMyCSV — Instant Excel/CSV Cleaner 🧹
+Upload messy data → download a clean dataset in seconds.  
+Perfect for Data Analysts, Engineers & Business Teams.
 
-Upload messy data → download a clean file.  
-Built with **Streamlit + Pandas**.
+🔗 **Live App:**  
+https://cleanmycsv-6swrktzuhcqfzbild95nyk.streamlit.app/
 
-## Features
-- Trim spaces
-- Standardize column names (snake_case)
-- Drop empty rows/columns
-- Remove duplicates
-- Coerce numeric columns
-- Optional: parse dates
-- Download as CSV or Excel
+---
 
-## Run locally
+## 🚀 Features
+
+✅ Supports `.csv`, `.xlsx`, `.xls`  
+✅ Auto-detect delimiter  
+✅ Standardizes column names → `snake_case` (Python-friendly)  
+✅ Removes:
+- Duplicate rows
+- Fully empty rows & columns
+- Extra spaces in text fields  
+✅ Fixes numbers → removes commas, coerces to numeric  
+✅ Optional auto date parsing  
+✅ Download results in CSV or Excel format  
+✅ Privacy safe — file processed in memory only ✅  
+✅ Fully open-source project ✅  
+
+---
+
+## 🧠 Tech Stack
+
+| Technology | Purpose |
+|-----------|---------|
+| **Python** | Data processing logic |
+| **Pandas** | Cleaning & transformations |
+| **Streamlit** | Web interface |
+| **OpenPyXL** | Excel export |
+| **NumPy** | Numeric handling |
+
+---
+
+## 🖥️ Preview (Screenshots)
+
+> 📌 Add screenshots here once ready (UI & cleaning preview)
+
+| Original Input | Cleaned Output |
+|----------------|----------------|
+| (screenshot) | (screenshot) |
+
+---
+
+## 📦 Installation (Run Locally)
+
 ```bash
+git clone https://github.com/yashchaudhary251/CleanMyCSV.git
+cd CleanMyCSV
 pip install -r requirements.txt
 streamlit run app.py
-```
-Then open the URL Streamlit prints (usually http://localhost:8501).
-
-## Deploy (Streamlit Community Cloud)
-1. Push this folder to a GitHub repo
-2. Go to https://share.streamlit.io/
-3. Connect your repo, pick `app.py` as entrypoint
-4. Deploy!
