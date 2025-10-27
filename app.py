@@ -3,6 +3,12 @@ import io
 import pandas as pd
 import streamlit as st
 from cleaner import clean_dataframe, detect_delimiter
+from ai_helper import (
+    data_quality_report,
+    ai_suggest_cleaning,
+    ai_apply_instructions_safe,
+    OPENAI_READY,
+)
 
 # ---------- Page config ----------
 st.set_page_config(
@@ -29,17 +35,25 @@ with st.sidebar:
     opt_drop_duplicates = st.checkbox("Remove duplicate rows", value=True)
     opt_fix_numbers = st.checkbox("Fix numeric columns (remove commas, coerce)", value=True)
     opt_parse_dates = st.checkbox("Try to parse dates", value=False)
+
     st.markdown("---")
     st.caption("Tip: You can toggle options and re-run without re-uploading.")
 
-# ---------- Sample CSV helper (optional) ----------
+    st.markdown("---")
+    st.subheader("🤖 AI Assistant (Optional)")
+    if OPENAI_READY:
+        st.caption("OpenAI key found in secrets. AI features enabled.")
+    else:
+        st.caption("Add OPENAI_API_KEY in Streamlit secrets to enable LLM (fallback heuristics will be used).")
+
+# ---------- Sample CSV helper ----------
 with st.expander("Need a sample file? Click here to download a demo CSV"):
     sample_df = pd.DataFrame(
         {
-            "Name": ["Alice", "Bob", "  Charlie  ", "Alice"],
+            "Full Name": ["Alice", "Bob", "  Charlie  ", "Alice"],
             "Email": ["alice@example.com", "bob@example.com", "charlie@example.com", "alice@example.com"],
-            "Amount": ["1,200", "450", " 300 ", "1,200"],
-            "Date": ["2024-01-05", "05/01/2024", "Jan 5, 2024", "2024/01/05"],
+            "Amount (INR)": ["1,200", "450", " 300 ", "1,200"],
+            "Order Date": ["2024-01-05", "05/01/2024", "Jan 5, 2024", "2024/01/05"],
             "Notes": ["hello  ", None, "", "  duplicate "],
         }
     )
@@ -74,12 +88,12 @@ if uploaded:
         st.error(f"Failed to read file: {e}")
         st.stop()
 
-    # 2) Show original (unchanged)
+    # 2) Original (unchanged)
     st.subheader("👀 Preview (Original)")
     st.dataframe(df_original.head(50), use_container_width=True)
     st.caption("👀 Original uploaded dataset — column format unchanged.")
 
-    # 3) Cleaned dataframe (analysis-friendly)
+    # 3) Cleaned (analysis-friendly)
     df_cleaned = clean_dataframe(
         df_original,
         trim_spaces=opt_trim,
@@ -95,29 +109,65 @@ if uploaded:
     st.dataframe(df_cleaned.head(50), use_container_width=True)
     st.caption("✅ Cleaned dataset — columns standardized to **snake_case** (data-analysis friendly).")
 
-    # 4) Cleaning summary
-    st.subheader("📊 Cleaning Summary")
+    # 4) Data Quality Report
+    with st.expander("📊 Data Quality Report"):
+        report = data_quality_report(df_original, df_cleaned)
+        st.markdown(report, unsafe_allow_html=True)
+
+    # 5) AI Suggestions
+    st.subheader("🤖 AI Suggestions")
+    st.caption("Ask the AI what else should be cleaned or standardized.")
+    if st.button("Generate AI Cleaning Suggestions"):
+        suggestions_md = ai_suggest_cleaning(df_original, df_cleaned)
+        st.markdown(suggestions_md, unsafe_allow_html=True)
+
+    # 6) Natural-language cleaning (safe)
+    st.subheader("🧹 Natural-Language Cleaning (Beta)")
+    st.caption("Examples: `drop rows where email is null`, `rename Full Name -> full_name`, `parse Order Date as yyyy-mm-dd`")
+    instructions = st.text_area("Describe changes to apply", height=110, placeholder="rename Full Name -> full_name; drop rows where Email is null; convert Amount (INR) to numeric")
+    if st.button("Apply Instructions"):
+        df_updated, change_log = ai_apply_instructions_safe(df_cleaned, instructions)
+        st.success("Applied instructions (within safe set).")
+        st.markdown("**Change Log**")
+        st.write("• " + "\n• ".join(change_log) if change_log else "No changes detected.")
+        st.subheader("🆕 Preview (After Instructions)")
+        st.dataframe(df_updated.head(50), use_container_width=True)
+        # Offer downloads of the updated frame
+        st.subheader("⬇️ Download Updated File")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.download_button(
+                "Download as CSV",
+                data=df_updated.to_csv(index=False).encode("utf-8"),
+                file_name="cleaned_updated.csv",
+                mime="text/csv",
+            )
+        with c2:
+            xbuf = io.BytesIO()
+            with pd.ExcelWriter(xbuf, engine="openpyxl") as writer:
+                df_updated.to_excel(writer, index=False, sheet_name="Updated Data")
+            st.download_button(
+                "Download as Excel (.xlsx)",
+                data=xbuf.getvalue(),
+                file_name="cleaned_updated.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+    # 7) Cleaning summary
+    st.subheader("🧾 Cleaning Summary (Base Options)")
     changes = []
-    if opt_trim:
-        changes.append("Trimmed spaces")
-    if opt_standardize_cols:
-        changes.append("Standardized column names (snake_case)")
-    if opt_drop_empty_rows:
-        changes.append("Removed fully empty rows")
-    if opt_drop_empty_cols:
-        changes.append("Removed fully empty columns")
-    if opt_drop_duplicates:
-        changes.append("Removed duplicate rows")
-    if opt_fix_numbers:
-        changes.append("Fixed numeric columns (removed commas, coerced types)")
-    if opt_parse_dates:
-        changes.append("Parsed dates where possible")
+    if opt_trim: changes.append("Trimmed spaces")
+    if opt_standardize_cols: changes.append("Standardized column names (snake_case)")
+    if opt_drop_empty_rows: changes.append("Removed fully empty rows")
+    if opt_drop_empty_cols: changes.append("Removed fully empty columns")
+    if opt_drop_duplicates: changes.append("Removed duplicate rows")
+    if opt_fix_numbers: changes.append("Fixed numeric columns (removed commas, coerced types)")
+    if opt_parse_dates: changes.append("Parsed dates where possible")
     if not changes:
         changes = ["No cleaning options selected"]
-
     st.markdown("• " + "<br>• ".join(changes), unsafe_allow_html=True)
 
-    # 5) Downloads
+    # 8) Base downloads
     st.subheader("⬇️ Download Cleaned File")
     col1, col2 = st.columns(2)
     with col1:
@@ -146,6 +196,7 @@ st.markdown(
     "<hr style='opacity:0.2'>"
     "<div style='text-align:center; opacity:0.75'>"
     "Built by <b>Yash Chaudhary</b> • "
+    "<a href='https://cleanmycsv-6swrktzuhcqfzbild95nyk.streamlit.app/' target='_blank'>Live App</a> • "
     "<a href='https://github.com/yashchaudhary251/CleanMyCSV' target='_blank'>GitHub</a>"
     "</div>",
     unsafe_allow_html=True,
